@@ -94,3 +94,62 @@ export interface IdLookupResponse {
   };
   message?: string;
 }
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  userType: 'student' | 'staff' | 'public';
+  durationType: 'walk-in' | 'monthly' | 'semester' | 'half-year' | 'yearly';
+  priceCedis: number;
+  durationDays: number;
+  description?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UserSubscription {
+  id: string;
+  userId: string;
+  subscriptionPlanId: string;
+  status: 'pending' | 'active' | 'expired' | 'cancelled' | 'suspended';
+  paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
+  startDate?: Date;
+  endDate?: Date;
+  paymentReference?: string;
+  amountPaid?: number;
+  currency: string;
+  autoRenew: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  userSubscriptionId: string;
+  paymentReference: string;
+  paystackReference?: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'success' | 'failed' | 'abandoned';
+  paymentMethod?: string;
+  gatewayResponse?: string;
+  paidAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateSubscriptionRequest {
+  planId: string;
+  autoRenew?: boolean;
+}
+
+export interface PaystackInitializeResponse {
+  status: boolean;
+  message: string;
+  data: {
+    authorization_url: string;
+    access_code: string;
+    reference: string;
+  };
+}
