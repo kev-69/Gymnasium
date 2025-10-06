@@ -50,6 +50,25 @@ export interface AuthTokenPayload {
   email: string;
 }
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  passwordHash: string;
+  firstName: string;
+  lastName: string;
+  role: 'admin' | 'super_admin';
+  isActive: boolean;
+  lastLoginAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AdminTokenPayload {
+  adminId: string;
+  email: string;
+  role: 'admin' | 'super_admin';
+}
+
 export interface LoginRequest {
   email?: string;
   password?: string;
@@ -68,6 +87,11 @@ export interface RegisterPublicUserRequest {
 export interface RegisterUniversityUserRequest {
   universityId: string;
   pin: string;
+}
+
+export interface AdminLoginRequest {
+  email: string;
+  password: string;
 }
 
 export interface IdLookupRequest {
