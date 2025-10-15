@@ -76,10 +76,12 @@ export interface PaymentTransaction {
   id: string;
   userSubscriptionId: string;
   paymentReference: string;
+  paystackReference?: string;
   amount: number;
   currency: string;
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   paymentMethod?: string;
+  paidAt?: string;
   gatewayResponse?: any;
   createdAt: string;
   updatedAt: string;
