@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import Table from '../components/ui/Table';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import EmptyState from '../components/ui/EmptyState';
-import Modal from '../components/ui/Modal';
+import { PaymentDetailsModal } from '../components/modals/PaymentDetailsModal';
+import { RecordPaymentModal } from '../components/modals/RecordPaymentModal';
+import { RefundPaymentModal } from '../components/modals/RefundPaymentModal';
+import { RetryPaymentModal } from '../components/modals/RetryPaymentModal';
 import { paymentsApi } from '../services/api';
 import type { PaymentTransaction } from '../types';
 
@@ -11,7 +14,10 @@ export default function Payments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentTransaction | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentDetailsModal, setShowPaymentDetailsModal] = useState(false);
+  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+  const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showRetryModal, setShowRetryModal] = useState(false);
   
   // Filtering and pagination state
   const [searchTerm, setSearchTerm] = useState('');
@@ -97,52 +103,36 @@ export default function Payments() {
 
   const handleViewPayment = (payment: PaymentTransaction) => {
     setSelectedPayment(payment);
-    setShowPaymentModal(true);
+    setShowPaymentDetailsModal(true);
   };
 
-  const handleRetryPayment = async (paymentId: string) => {
-    try {
-      await paymentsApi.retryPayment(paymentId);
-      // Refresh payments list
-      const params = {
-        page: currentPage,
-        limit: limit,
-        ...(selectedStatus && { status: selectedStatus }),
-        ...(searchTerm && { search: searchTerm }),
-        ...(dateFrom && { dateFrom }),
-        ...(dateTo && { dateTo }),
-      };
-      const response = await paymentsApi.getTransactions(params);
-      if (response.data) {
-        setPayments(response.data.transactions.map(normalizePayment));
-      }
-    } catch (err) {
-      console.error('Failed to retry payment:', err);
-    }
+  const handleRecordPayment = (payment: PaymentTransaction) => {
+    setSelectedPayment(payment);
+    setShowRecordPaymentModal(true);
   };
 
-  const handleMarkCompleted = async (paymentId: string, amount: number) => {
-    try {
-      await paymentsApi.markPaymentCompleted(paymentId, {
-        amountPaid: amount,
-        paymentMethod: 'manual', // Default method for manual completion
-        notes: 'Manually marked as completed by admin'
-      });
-      // Refresh payments list
-      const params = {
-        page: currentPage,
-        limit: limit,
-        ...(selectedStatus && { status: selectedStatus }),
-        ...(searchTerm && { search: searchTerm }),
-        ...(dateFrom && { dateFrom }),
-        ...(dateTo && { dateTo }),
-      };
-      const response = await paymentsApi.getTransactions(params);
-      if (response.data) {
-        setPayments(response.data.transactions.map(normalizePayment));
-      }
-    } catch (err) {
-      console.error('Failed to mark payment as completed:', err);
+  const handleRefundPayment = (payment: PaymentTransaction) => {
+    setSelectedPayment(payment);
+    setShowRefundModal(true);
+  };
+
+  const handleRetryPaymentModal = (payment: PaymentTransaction) => {
+    setSelectedPayment(payment);
+    setShowRetryModal(true);
+  };
+
+  const refreshPayments = async () => {
+    const params = {
+      page: currentPage,
+      limit: limit,
+      ...(selectedStatus && { status: selectedStatus }),
+      ...(searchTerm && { search: searchTerm }),
+      ...(dateFrom && { dateFrom }),
+      ...(dateTo && { dateTo }),
+    };
+    const response = await paymentsApi.getTransactions(params);
+    if (response.data) {
+      setPayments(response.data.transactions.map(normalizePayment));
     }
   };
 
@@ -235,7 +225,7 @@ export default function Payments() {
           </button>
           {payment.status === 'failed' && (
             <button
-              onClick={() => handleRetryPayment(payment.id)}
+              onClick={() => handleRetryPaymentModal(payment)}
               className="text-green-600 hover:text-green-900 text-sm font-medium"
             >
               Retry
@@ -243,10 +233,10 @@ export default function Payments() {
           )}
           {payment.status === 'pending' && (
             <button
-              onClick={() => handleMarkCompleted(payment.id, payment.amount)}
+              onClick={() => handleRecordPayment(payment)}
               className="text-green-600 hover:text-green-900 text-sm font-medium"
             >
-              Mark Completed
+              Record Payment
             </button>
           )}
         </div>
@@ -504,96 +494,57 @@ export default function Payments() {
       )}
 
       {/* Payment Details Modal */}
-      {showPaymentModal && selectedPayment && (
-        <Modal
-          isOpen={showPaymentModal}
-          title="Payment Transaction Details"
+      {showPaymentDetailsModal && selectedPayment && (
+        <PaymentDetailsModal
+          isOpen={showPaymentDetailsModal}
           onClose={() => {
-            setShowPaymentModal(false);
+            setShowPaymentDetailsModal(false);
             setSelectedPayment(null);
           }}
-        >
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Payment Reference</label>
-                <p className="mt-1 text-sm text-gray-900">{selectedPayment.paymentReference}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Amount</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {formatCurrency(selectedPayment.amount)} {selectedPayment.currency}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Status</label>
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getBadgeColor(selectedPayment.status)}`}>
-                  {selectedPayment.status.charAt(0).toUpperCase() + selectedPayment.status.slice(1)}
-                </span>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Payment Method</label>
-                <p className="mt-1 text-sm text-gray-900">{selectedPayment.paymentMethod || 'Unknown'}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">User</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {(selectedPayment as any).user_name || 'Unknown User'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {(selectedPayment as any).user_email || 'No email'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Transaction Date</label>
-                <p className="mt-1 text-sm text-gray-900">{formatDate(selectedPayment.createdAt)}</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Last Updated</label>
-                <p className="mt-1 text-sm text-gray-900">{formatDate(selectedPayment.updatedAt)}</p>
-              </div>
-            </div>
-            
-            {selectedPayment.gatewayResponse && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Gateway Response</label>
-                <pre className="mt-1 text-xs text-gray-600 bg-gray-50 p-2 rounded border overflow-auto">
-                  {JSON.stringify(selectedPayment.gatewayResponse, null, 2)}
-                </pre>
-              </div>
-            )}
-            
-            <div className="pt-4 border-t border-gray-200">
-              <div className="flex space-x-3">
-                {selectedPayment.status === 'failed' && (
-                  <button
-                    onClick={() => {
-                      handleRetryPayment(selectedPayment.id);
-                      setShowPaymentModal(false);
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
-                  >
-                    Retry Payment
-                  </button>
-                )}
-                {selectedPayment.status === 'pending' && (
-                  <button
-                    onClick={() => {
-                      handleMarkCompleted(selectedPayment.id, selectedPayment.amount);
-                      setShowPaymentModal(false);
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
-                  >
-                    Mark as Completed
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </Modal>
+          paymentId={selectedPayment.id}
+          onRetry={handleRetryPaymentModal}
+          onRefund={handleRefundPayment}
+        />
+      )}
+
+      {/* Record Payment Modal */}
+      {showRecordPaymentModal && selectedPayment && (
+        <RecordPaymentModal
+          isOpen={showRecordPaymentModal}
+          onClose={() => {
+            setShowRecordPaymentModal(false);
+            setSelectedPayment(null);
+          }}
+          onSuccess={refreshPayments}
+          transactionId={selectedPayment.id}
+          expectedAmount={selectedPayment.amount}
+        />
+      )}
+
+      {/* Refund Payment Modal */}
+      {showRefundModal && selectedPayment && (
+        <RefundPaymentModal
+          isOpen={showRefundModal}
+          onClose={() => {
+            setShowRefundModal(false);
+            setSelectedPayment(null);
+          }}
+          onSuccess={refreshPayments}
+          payment={selectedPayment}
+        />
+      )}
+
+      {/* Retry Payment Modal */}
+      {showRetryModal && selectedPayment && (
+        <RetryPaymentModal
+          isOpen={showRetryModal}
+          onClose={() => {
+            setShowRetryModal(false);
+            setSelectedPayment(null);
+          }}
+          onSuccess={refreshPayments}
+          payment={selectedPayment}
+        />
       )}
     </div>
   );
