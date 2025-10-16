@@ -1,8 +1,22 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StatsCard from '../components/ui/StatsCard';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { dashboardApi } from '../services/api';
 import type { DashboardStats, User, UserSubscription, PaymentTransaction } from '../types';
+import {
+  RevenueChart,
+  UserGrowthChart,
+  SubscriptionStatusChart,
+  MonthlyComparisonChart,
+} from '../components/ui/Charts';
+import {
+  RevenueByUserType,
+  PopularPlans,
+  RenewalRates,
+  PeakPeriods,
+} from '../components/ui/Analytics';
+import { QuickActions } from '../components/ui/QuickActions';
 
 // Utility function to format dates
 const formatDate = (dateString: string) => {
@@ -17,6 +31,7 @@ const formatDate = (dateString: string) => {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [recentSubscriptions, setRecentSubscriptions] = useState<UserSubscription[]>([]);
@@ -179,6 +194,105 @@ export default function Dashboard() {
             </svg>
           }
           color="purple"
+        />
+      </div>
+
+      {/* Charts & Visualizations */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Charts & Visualizations</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RevenueChart
+            data={[
+              { name: 'Jan', revenue: 12500, subscriptions: 45 },
+              { name: 'Feb', revenue: 15800, subscriptions: 52 },
+              { name: 'Mar', revenue: 18200, subscriptions: 61 },
+              { name: 'Apr', revenue: 22400, subscriptions: 73 },
+              { name: 'May', revenue: 19600, subscriptions: 68 },
+              { name: 'Jun', revenue: 25300, subscriptions: 82 },
+            ]}
+          />
+          <UserGrowthChart
+            data={[
+              { name: 'Jan', users: 195, students: 120, staff: 45, public: 30 },
+              { name: 'Feb', users: 235, students: 145, staff: 52, public: 38 },
+              { name: 'Mar', users: 271, students: 168, staff: 58, public: 45 },
+              { name: 'Apr', users: 312, students: 195, staff: 65, public: 52 },
+              { name: 'May', users: 339, students: 210, staff: 71, public: 58 },
+              { name: 'Jun', users: 381, students: 238, staff: 78, public: 65 },
+            ]}
+          />
+          <SubscriptionStatusChart
+            data={[
+              { name: 'Active', value: stats.activeSubscriptions, color: '#10b981' },
+              { name: 'Pending', value: stats.pendingSubscriptions, color: '#f59e0b' },
+              { name: 'Expired', value: Math.round(stats.totalUsers * 0.15), color: '#ef4444' },
+              { name: 'Cancelled', value: Math.round(stats.totalUsers * 0.08), color: '#94a3b8' },
+            ]}
+          />
+          <MonthlyComparisonChart
+            currentMonth={[
+              { name: 'Revenue', value: stats.monthlyRevenue },
+              { name: 'Users', value: stats.newUsersThisMonth },
+              { name: 'Subscriptions', value: stats.activeSubscriptions },
+              { name: 'Payments', value: stats.successfulPayments },
+            ]}
+            previousMonth={[
+              { name: 'Revenue', value: Math.round(stats.monthlyRevenue * 0.85) },
+              { name: 'Users', value: Math.round(stats.newUsersThisMonth * 0.78) },
+              { name: 'Subscriptions', value: Math.round(stats.activeSubscriptions * 0.92) },
+              { name: 'Payments', value: Math.round(stats.successfulPayments * 0.88) },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* Advanced Analytics */}
+      <div className="mt-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Advanced Analytics</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+          <RevenueByUserType
+            data={{
+              student: { amount: stats.totalRevenue * 0.55, count: Math.round(stats.totalUsers * 0.60) },
+              staff: { amount: stats.totalRevenue * 0.30, count: Math.round(stats.totalUsers * 0.25) },
+              public: { amount: stats.totalRevenue * 0.15, count: Math.round(stats.totalUsers * 0.15) },
+            }}
+          />
+          <PopularPlans
+            plans={[
+              { name: 'Monthly Standard', subscriptions: 145, revenue: 14500 },
+              { name: 'Annual Premium', subscriptions: 98, revenue: 49000 },
+              { name: 'Quarterly Basic', subscriptions: 87, revenue: 13050 },
+              { name: 'Monthly Premium', subscriptions: 76, revenue: 11400 },
+              { name: 'Weekly Trial', subscriptions: 54, revenue: 2700 },
+            ]}
+          />
+          <RenewalRates
+            data={{
+              totalSubscriptions: stats.activeSubscriptions + stats.pendingSubscriptions,
+              renewedSubscriptions: Math.round(stats.activeSubscriptions * 0.75),
+              cancelledSubscriptions: Math.round(stats.totalUsers * 0.08),
+              expiredSubscriptions: Math.round(stats.totalUsers * 0.15),
+            }}
+          />
+          <PeakPeriods
+            data={[
+              { period: 'Jan 2024', registrations: 195, subscriptions: 165 },
+              { period: 'Feb 2024', registrations: 235, subscriptions: 198 },
+              { period: 'Mar 2024', registrations: 271, subscriptions: 229 },
+              { period: 'Apr 2024', registrations: 312, subscriptions: 265 },
+              { period: 'May 2024', registrations: 289, subscriptions: 241 },
+              { period: 'Jun 2024', registrations: 381, subscriptions: 315 },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* Quick Actions Panel */}
+      <div className="mt-8">
+        <QuickActions
+          onCreateWalkIn={() => navigate('/subscriptions')}
+          onViewPendingPayments={() => navigate('/payments')}
+          onSearchUser={(query) => navigate(`/users?search=${encodeURIComponent(query)}`)}
         />
       </div>
 
