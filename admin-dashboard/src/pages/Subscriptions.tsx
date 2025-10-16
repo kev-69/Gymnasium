@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import Table from '../components/ui/Table';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import EmptyState from '../components/ui/EmptyState';
-import Modal from '../components/ui/Modal';
+import WalkInSubscriptionModal from '../components/modals/WalkInSubscriptionModal';
+import ExtendSubscriptionModal from '../components/modals/ExtendSubscriptionModal';
+import CancelSubscriptionModal from '../components/modals/CancelSubscriptionModal';
+import { SubscriptionDetailsModal } from '../components/modals/SubscriptionDetailsModal';
+import { CreatePlanModal } from '../components/modals/CreatePlanModal';
+import { EditPlanModal } from '../components/modals/EditPlanModal';
+import { TogglePlanStatusModal } from '../components/modals/TogglePlanStatusModal';
 import { subscriptionsApi } from '../services/api';
 import type { UserSubscription, SubscriptionPlan } from '../types';
 
@@ -13,11 +19,14 @@ export default function Subscriptions() {
   const [plansLoading, setPlansLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedSubscription, setSelectedSubscription] = useState<UserSubscription | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  // @ts-ignore - TODO: Implement plan modal
-  const [showPlanModal, setShowPlanModal] = useState(false);
-  // @ts-ignore - TODO: Implement walk-in modal  
+  const [showExtendModal, setShowExtendModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [showWalkInModal, setShowWalkInModal] = useState(false);
+  const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
+  const [showEditPlanModal, setShowEditPlanModal] = useState(false);
+  const [showTogglePlanModal, setShowTogglePlanModal] = useState(false);
   
   // Filtering and pagination state
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,6 +51,21 @@ export default function Subscriptions() {
     createdAt: subscription.created_at || subscription.createdAt,
     updatedAt: subscription.updated_at || subscription.updatedAt,
   });
+
+  // Fetch plans function (defined outside useEffect so modals can call it)
+  const fetchPlans = async () => {
+    try {
+      setPlansLoading(true);
+      const response = await subscriptionsApi.getPlans();
+      if (response.data) {
+        setPlans(response.data);
+      }
+    } catch (err) {
+      console.error('Plans fetch error:', err);
+    } finally {
+      setPlansLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchSubscriptions = async () => {
@@ -70,20 +94,6 @@ export default function Subscriptions() {
       }
     };
 
-    const fetchPlans = async () => {
-      try {
-        setPlansLoading(true);
-        const response = await subscriptionsApi.getPlans();
-        if (response.data) {
-          setPlans(response.data);
-        }
-      } catch (err) {
-        console.error('Plans fetch error:', err);
-      } finally {
-        setPlansLoading(false);
-      }
-    };
-
     if (activeTab === 'subscriptions') {
       fetchSubscriptions();
     }
@@ -95,42 +105,14 @@ export default function Subscriptions() {
     setShowSubscriptionModal(true);
   };
 
-  const handleCancelSubscription = async (subscriptionId: string, reason?: string) => {
-    try {
-      await subscriptionsApi.cancelSubscription(subscriptionId, reason);
-      // Refresh subscriptions list
-      const params = {
-        page: currentPage,
-        limit: limit,
-        ...(selectedStatus && { status: selectedStatus }),
-        ...(selectedUserType && { userType: selectedUserType }),
-      };
-      const response = await subscriptionsApi.getSubscriptions(params);
-      if (response.data) {
-        setSubscriptions(response.data.subscriptions.map(normalizeSubscription));
-      }
-    } catch (err) {
-      console.error('Failed to cancel subscription:', err);
-    }
+  const handleCancelSubscription = (subscription: UserSubscription) => {
+    setSelectedSubscription(subscription);
+    setShowCancelModal(true);
   };
 
-  const handleExtendSubscription = async (subscriptionId: string, days: number) => {
-    try {
-      await subscriptionsApi.extendSubscription(subscriptionId, days);
-      // Refresh subscriptions list
-      const params = {
-        page: currentPage,
-        limit: limit,
-        ...(selectedStatus && { status: selectedStatus }),
-        ...(selectedUserType && { userType: selectedUserType }),
-      };
-      const response = await subscriptionsApi.getSubscriptions(params);
-      if (response.data) {
-        setSubscriptions(response.data.subscriptions.map(normalizeSubscription));
-      }
-    } catch (err) {
-      console.error('Failed to extend subscription:', err);
-    }
+  const handleExtendSubscription = (subscription: UserSubscription) => {
+    setSelectedSubscription(subscription);
+    setShowExtendModal(true);
   };
 
   const getBadgeColor = (status: string) => {
@@ -211,13 +193,13 @@ export default function Subscriptions() {
           {subscription.status === 'active' && (
             <>
               <button
-                onClick={() => handleExtendSubscription(subscription.id, 30)}
+                onClick={() => handleExtendSubscription(subscription)}
                 className="text-green-600 hover:text-green-900 text-sm font-medium"
               >
                 Extend
               </button>
               <button
-                onClick={() => handleCancelSubscription(subscription.id, 'Admin cancelled')}
+                onClick={() => handleCancelSubscription(subscription)}
                 className="text-red-600 hover:text-red-900 text-sm font-medium"
               >
                 Cancel
@@ -274,19 +256,13 @@ export default function Subscriptions() {
         </div>
         <div className="flex space-x-3">
           <button
-            onClick={() => {
-              setShowWalkInModal(true);
-              console.log('Walk-in modal not implemented yet');
-            }}
+            onClick={() => setShowWalkInModal(true)}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             Create Walk-in Subscription
           </button>
           <button
-            onClick={() => {
-              setShowPlanModal(true);
-              console.log('Plan modal not implemented yet');
-            }}
+            onClick={() => setShowCreatePlanModal(true)}
             className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
           >
             Add Plan
@@ -437,10 +413,7 @@ export default function Subscriptions() {
               description="Create your first subscription plan to get started."
               action={{
                 label: "Add Plan",
-                onClick: () => {
-                  setShowPlanModal(true);
-                  console.log('Plan modal not implemented yet');
-                }
+                onClick: () => setShowCreatePlanModal(true)
               }}
             />
           ) : (
@@ -475,10 +448,26 @@ export default function Subscriptions() {
                   </div>
                   
                   <div className="flex space-x-2">
-                    <button className="flex-1 px-3 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-50">
+                    <button 
+                      onClick={() => {
+                        setSelectedPlan(plan);
+                        setShowEditPlanModal(true);
+                      }}
+                      className="flex-1 px-3 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-md hover:bg-blue-50"
+                    >
                       Edit
                     </button>
-                    <button className="flex-1 px-3 py-2 text-sm font-medium text-red-600 border border-red-600 rounded-md hover:bg-red-50">
+                    <button 
+                      onClick={() => {
+                        setSelectedPlan(plan);
+                        setShowTogglePlanModal(true);
+                      }}
+                      className={`flex-1 px-3 py-2 text-sm font-medium border rounded-md ${
+                        plan.isActive
+                          ? 'text-red-600 border-red-600 hover:bg-red-50'
+                          : 'text-green-600 border-green-600 hover:bg-green-50'
+                      }`}
+                    >
                       {plan.isActive ? 'Deactivate' : 'Activate'}
                     </button>
                   </div>
@@ -491,80 +480,137 @@ export default function Subscriptions() {
 
       {/* Subscription Details Modal */}
       {showSubscriptionModal && selectedSubscription && (
-        <Modal
+        <SubscriptionDetailsModal
           isOpen={showSubscriptionModal}
-          title="Subscription Details"
           onClose={() => {
             setShowSubscriptionModal(false);
             setSelectedSubscription(null);
           }}
-        >
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">User</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {(selectedSubscription as any).user_name || 'Unknown User'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {(selectedSubscription as any).user_email || 'No email'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Plan</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {(selectedSubscription as any).plan_name || 'Unknown Plan'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Status</label>
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getBadgeColor(selectedSubscription.status)}`}>
-                  {selectedSubscription.status.charAt(0).toUpperCase() + selectedSubscription.status.slice(1)}
-                </span>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Start Date</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {formatDate(selectedSubscription.startDate || '')}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">End Date</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {formatDate(selectedSubscription.endDate || '')}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Amount Paid</label>
-                <p className="mt-1 text-sm text-gray-900">
-                  {formatCurrency(parseFloat((selectedSubscription as any).amount_paid || '0'))}
-                </p>
-              </div>
-            </div>
-            
-            {selectedSubscription.status === 'active' && (
-              <div className="pt-4 border-t border-gray-200">
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => handleExtendSubscription(selectedSubscription.id, 30)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700"
-                  >
-                    Extend 30 Days
-                  </button>
-                  <button
-                    onClick={() => handleCancelSubscription(selectedSubscription.id, 'Admin cancelled')}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
-                  >
-                    Cancel Subscription
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </Modal>
+          subscriptionId={selectedSubscription.id}
+          onExtend={handleExtendSubscription}
+          onCancel={handleCancelSubscription}
+        />
+      )}
+
+      {/* Walk-in Subscription Modal */}
+      <WalkInSubscriptionModal
+        isOpen={showWalkInModal}
+        onClose={() => setShowWalkInModal(false)}
+        onSuccess={() => {
+          // Refresh subscriptions list
+          const fetchSubscriptions = async () => {
+            const params = {
+              page: currentPage,
+              limit: limit,
+              ...(selectedStatus && { status: selectedStatus }),
+              ...(selectedUserType && { userType: selectedUserType }),
+            };
+            const response = await subscriptionsApi.getSubscriptions(params);
+            if (response.data) {
+              setSubscriptions(response.data.subscriptions.map(normalizeSubscription));
+              setTotalSubscriptions(response.data.total);
+            }
+          };
+          fetchSubscriptions();
+        }}
+      />
+
+      {/* Extend Subscription Modal */}
+      {selectedSubscription && (
+        <ExtendSubscriptionModal
+          isOpen={showExtendModal}
+          onClose={() => {
+            setShowExtendModal(false);
+            setSelectedSubscription(null);
+          }}
+          onSuccess={() => {
+            // Refresh subscriptions list
+            const fetchSubscriptions = async () => {
+              const params = {
+                page: currentPage,
+                limit: limit,
+                ...(selectedStatus && { status: selectedStatus }),
+                ...(selectedUserType && { userType: selectedUserType }),
+              };
+              const response = await subscriptionsApi.getSubscriptions(params);
+              if (response.data) {
+                setSubscriptions(response.data.subscriptions.map(normalizeSubscription));
+              }
+            };
+            fetchSubscriptions();
+          }}
+          subscription={selectedSubscription}
+        />
+      )}
+
+      {/* Cancel Subscription Modal */}
+      {selectedSubscription && (
+        <CancelSubscriptionModal
+          isOpen={showCancelModal}
+          onClose={() => {
+            setShowCancelModal(false);
+            setSelectedSubscription(null);
+          }}
+          onSuccess={() => {
+            // Refresh subscriptions list
+            const fetchSubscriptions = async () => {
+              const params = {
+                page: currentPage,
+                limit: limit,
+                ...(selectedStatus && { status: selectedStatus }),
+                ...(selectedUserType && { userType: selectedUserType }),
+              };
+              const response = await subscriptionsApi.getSubscriptions(params);
+              if (response.data) {
+                setSubscriptions(response.data.subscriptions.map(normalizeSubscription));
+              }
+            };
+            fetchSubscriptions();
+          }}
+          subscription={selectedSubscription}
+        />
+      )}
+
+      {/* Create Plan Modal */}
+      <CreatePlanModal
+        isOpen={showCreatePlanModal}
+        onClose={() => setShowCreatePlanModal(false)}
+        onSuccess={() => {
+          // Refresh plans list
+          fetchPlans();
+        }}
+      />
+
+      {/* Edit Plan Modal */}
+      {selectedPlan && (
+        <EditPlanModal
+          isOpen={showEditPlanModal}
+          onClose={() => {
+            setShowEditPlanModal(false);
+            setSelectedPlan(null);
+          }}
+          onSuccess={() => {
+            // Refresh plans list
+            fetchPlans();
+          }}
+          plan={selectedPlan}
+        />
+      )}
+
+      {/* Toggle Plan Status Modal */}
+      {selectedPlan && (
+        <TogglePlanStatusModal
+          isOpen={showTogglePlanModal}
+          onClose={() => {
+            setShowTogglePlanModal(false);
+            setSelectedPlan(null);
+          }}
+          onSuccess={() => {
+            // Refresh plans list
+            fetchPlans();
+          }}
+          plan={selectedPlan}
+        />
       )}
     </div>
   );
